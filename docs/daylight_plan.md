@@ -19,6 +19,24 @@ map matrix, land data, area data, map and prop textures (all 7 DS texture format
 materials, GX display lists) and the area light files, and renders a field view in the original's colours and
 in the Daylight style: `./gradlew :tools:renderMap -Pargs="--header 60"` (New Bark Town) writes PNGs to `out/`.
 
+## Built so far (2026-10-17)
+The walk-around demo on the DC-1 (`./gradlew :app:installFast` from `android/`, app id `dev.hgdaylight.ss`):
+- the field from the ROM in the Daylight style (fitted grays, ink, 1.5 px outlines, steady camera), 60 fps;
+- the hero (hand-toned) walking with the decomp's timing, collision, ledges and BDHC heights;
+- the map's people and objects standing in place (zone events, the sprite table in overlay 1);
+- doors and exit mats warping between maps (the map header table in the ARM9 binary), with a black fade;
+- the field touch menu's background as a panel docked in a corner (drag to another corner, double-tap to fold).
+
+Next, in order:
+1. The touch menu's icons (OBJ cells: NCER + NCGR from a/0/1/4, palette 14, `src/field/touchscreen_menu.c`)
+   and what they open.
+2. Talking: A on an NPC or a sign (bg events) runs its script; needs the message decoder (`files/msgdata`) and
+   the event-script VM (`src/scrcmd*.c`).
+3. NPC movement types (wander, look around) and event flags (who is hidden at the start).
+4. Art touch-ups by hand: striped roofs, inked grass tufts as in the mockup, the windmills (thin geometry
+   that the outline pass turns into broken lines).
+5. Settings sheet (DQ's): steady camera, line width, panel scale, tone presets.
+
 ## Owner decisions (2026-10-17)
 - **SoulSilver only** (`rom/soulsilver.us.nds`, `sha1 f8dc38ea20c17541a43b58c5e6d18c1732c7e582`).
 - **The look** (owner's mockup of New Bark Town): no big changes to the game; change how it renders: solid
