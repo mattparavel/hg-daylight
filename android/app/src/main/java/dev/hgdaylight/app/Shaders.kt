@@ -100,9 +100,11 @@ uniform float uNear;
 uniform float uFar;
 uniform float uCrease;
 uniform vec2 uInk;
+uniform bool uOrtho;
 out vec4 oOut;
 float linz(ivec2 q) {
     float d = texelFetch(uDepth, q, 0).r * 2.0 - 1.0;
+    if (uOrtho) return (d * (uFar - uNear) + uFar + uNear) * 0.5;
     return 2.0 * uFar * uNear / (uFar + uNear - d * (uFar - uNear));
 }
 void main() {

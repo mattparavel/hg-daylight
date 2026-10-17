@@ -245,33 +245,63 @@ class FieldRenderer(private val game: FieldGame) : GLSurfaceView.Renderer {
     private val right = FloatArray(3)
     private val up = FloatArray(3)
 
+    /**
+     * Steady camera (the default, *not in the original*): a parallel projection at exactly 1 world unit per
+     * canvas pixel, its target snapped to whole pixels in the view plane. Every pixel then moves by whole
+     * pixels while walking (no texel shimmer, no outlines switching on and off), and 32-unit billboards are
+     * exactly 32 pixels. The original's lens is narrow (half fovy 0x5C1, about 8 degrees) at about 1.013 px
+     * per unit at the target, so the picture barely changes. Off: the original perspective.
+     */
+    var steadyCamera = true
+
+    /** The view-plane offset the snap applied this frame; the player's billboard takes it too. */
+    private val snap = FloatArray(3)
+
     private fun camera() {
-        val t = game.cameraTarget()
+        val t0 = game.cameraTarget()
         val a = -(CAM_ANGLE_X.toShort().toInt()) * (2 * Math.PI / 65536)
-        val ex = t[0]; val ey = t[1] + (CAM_DISTANCE * Math.sin(a)).toFloat(); val ez = t[2] + (CAM_DISTANCE * Math.cos(a)).toFloat()
-        var fx = t[0] - ex; var fy = t[1] - ey; var fz = t[2] - ez
+        val dy = (CAM_DISTANCE * Math.sin(a)).toFloat(); val dz = (CAM_DISTANCE * Math.cos(a)).toFloat()
+        // Axes depend only on the fixed angle: forward toward the target, right, up.
+        var fx = 0f; var fy = -dy; var fz = -dz
         val fl = sqrt(fx * fx + fy * fy + fz * fz); fx /= fl; fy /= fl; fz /= fl
         var rx = -fz; var rz = fx
         val rl = sqrt(rx * rx + rz * rz); rx /= rl; rz /= rl
         val ux = -rz * fy; val uy = rz * fx - rx * fz; val uz = rx * fy
         right[0] = rx; right[1] = 0f; right[2] = rz
         up[0] = ux; up[1] = uy; up[2] = uz
+        val t = t0.copyOf()
+        snap.fill(0f)
+        if (steadyCamera) {
+            val ca = t[0] * rx + t[2] * rz
+            val cb = t[0] * ux + t[1] * uy + t[2] * uz
+            val da = Math.round(ca) - ca; val db = Math.round(cb) - cb
+            for (i in 0 until 3) snap[i] = right[i] * da + up[i] * db
+            for (i in 0 until 3) t[i] += snap[i]
+        }
+        val ex = t[0]; val ey = t[1] + dy; val ez = t[2] + dz
         val view = floatArrayOf(
             rx, 0f, rz, -(rx * ex + rz * ez),
             ux, uy, uz, -(ux * ex + uy * ey + uz * ez),
             fx, fy, fz, -(fx * ex + fy * ey + fz * ez),
             0f, 0f, 0f, 1f,
         )
-        // The DS's 192 rows span 2 tan(half fovy); the taller canvas keeps that density and shows more.
-        val tanY = tan(CAM_HALF_FOVY * (2 * Math.PI / 65536)).toFloat() * canvasH / 192f
-        val tanX = tanY * canvasW / canvasH
         val n = CAM_NEAR; val f = CAM_FAR
-        val proj = floatArrayOf(
-            1f / tanX, 0f, 0f, 0f,
-            0f, 1f / tanY, 0f, 0f,
-            0f, 0f, (f + n) / (f - n), -2f * f * n / (f - n),
-            0f, 0f, 1f, 0f,
-        )
+        val proj = if (steadyCamera) floatArrayOf(
+            2f / canvasW, 0f, 0f, 0f,
+            0f, 2f / canvasH, 0f, 0f,
+            0f, 0f, 2f / (f - n), -(f + n) / (f - n),
+            0f, 0f, 0f, 1f,
+        ) else {
+            // The DS's 192 rows span 2 tan(half fovy); the taller canvas keeps that density and shows more.
+            val tanY = tan(CAM_HALF_FOVY * (2 * Math.PI / 65536)).toFloat() * canvasH / 192f
+            val tanX = tanY * canvasW / canvasH
+            floatArrayOf(
+                1f / tanX, 0f, 0f, 0f,
+                0f, 1f / tanY, 0f, 0f,
+                0f, 0f, (f + n) / (f - n), -2f * f * n / (f - n),
+                0f, 0f, 1f, 0f,
+            )
+        }
         for (i in 0 until 4) for (j in 0 until 4) {
             var s = 0f
             for (k in 0 until 4) s += proj[i * 4 + k] * view[k * 4 + j]
@@ -366,7 +396,8 @@ class FieldRenderer(private val game: FieldGame) : GLSurfaceView.Renderer {
         val uTrans = glGetUniformLocation(sceneProg, "uTranslucent")
         val uId = glGetUniformLocation(sceneProg, "uId")
         glDisable(GL_CULL_FACE)
-        for (s in game.sprites()) {
+        for (s0 in game.sprites()) {
+            val s = if (s0.instance == FieldGame.PLAYER_ID) Sprite(s0.texture, s0.x + snap[0], s0.y + snap[1], s0.z + snap[2], s0.width, s0.height, s0.flip, s0.instance) else s0
             val hw = s.width / 2f; val h = s.height.toFloat()
             // Corners: feet at (x, y, z); billboard spans right and up.
             val corners = arrayOf(floatArrayOf(-hw, 0f), floatArrayOf(hw, 0f), floatArrayOf(-hw, h), floatArrayOf(hw, 0f), floatArrayOf(hw, h), floatArrayOf(-hw, h))
@@ -430,6 +461,7 @@ class FieldRenderer(private val game: FieldGame) : GLSurfaceView.Renderer {
         glUniform1f(glGetUniformLocation(linesProg, "uNear"), CAM_NEAR)
         glUniform1f(glGetUniformLocation(linesProg, "uFar"), CAM_FAR)
         glUniform1f(glGetUniformLocation(linesProg, "uCrease"), st.creaseRatio)
+        glUniform1i(glGetUniformLocation(linesProg, "uOrtho"), if (steadyCamera) 1 else 0)
         glUniform2f(glGetUniformLocation(linesProg, "uInk"), st.inkDark, st.inkLight)
         quad()
 

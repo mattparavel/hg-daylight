@@ -57,6 +57,7 @@ in the Daylight style: `./gradlew :tools:renderMap -Pargs="--header 60"` (New Ba
 
 DC-1 app window: 1184x1584 (Sol:OS override over the 1200x1600 panel).
 
+- **Steady camera** (default, *not in the original*): a parallel projection at 1 unit per canvas pixel, its target snapped to whole pixels, so walking scrolls the picture by whole pixels (no shimmer) and 32-unit sprites are exactly 32 px; the original perspective is an option.
 - **Field canvas: 296x396 at 4x**, edge to edge. 4x is the scale at which the DS's full 256-px width fits
   (5x gives 236 px, narrower than the original). The 3D camera keeps the original's pixel density: preset 0
   (`src/field/field_camera.c`: distance 666.9, x angle 0xDD62, half fovy 0x5C1) with its 192 rows' density,
