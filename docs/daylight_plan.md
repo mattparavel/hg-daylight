@@ -1,6 +1,6 @@
 # HG Daylight: plan
 
-A native Android (Kotlin) remake of *Pokémon HeartGold* for the Daylight DC-1, built the way DQ Daylight
+A native Android (Kotlin) remake of *Pokémon SoulSilver* for the Daylight DC-1, built the way DQ Daylight
 (`~/dq-daylight`) was: the app ships **no game data**, the player imports their own ROM once, and maps,
 graphics, text, scripts, sound and battle data are decoded from it on the device. Game logic is
 reimplemented natively in Kotlin.
@@ -14,7 +14,18 @@ Principles carried over from `~/dq-daylight/docs/dc1_product.md`: inside the gam
 original; layout, input, tones and pause/resume are designed for the DC-1; anything that changes what the
 player experiences is an option, off by default, captioned *Not in the original*.
 
-Status: plan only (2026-10-17).
+Status (2026-10-17): the field renderer works. `android/core` reads the SoulSilver ROM's NitroFS, NARCs,
+map matrix, land data, area data, map and prop textures (all 7 DS texture formats), BMD0 models (SBC, nodes,
+materials, GX display lists) and the area light files, and renders a field view in the original's colours and
+in the Daylight style: `./gradlew :core:renderMap -Pargs="--header 60"` (New Bark Town) writes PNGs to `out/`.
+
+## Owner decisions (2026-10-17)
+- **SoulSilver only** (`rom/soulsilver.us.nds`, `sha1 f8dc38ea20c17541a43b58c5e6d18c1732c7e582`).
+- **The look** (owner's mockup of New Bark Town): no big changes to the game; change how it renders: solid
+  black outlines where they make sense, shading retuned for a semi-low-contrast grayscale panel.
+- **The top screen's view fills the portrait screen.** The DS bottom screen becomes a panel the player can
+  dock in any corner (bottom left, bottom right, top left, top right).
+- **Movement as in DQ Daylight:** the invisible joystick anywhere on the screen.
 
 ## 1. How the decomp is used
 
@@ -42,18 +53,26 @@ Status: plan only (2026-10-17).
 | Sound | SDAT (SSEQ/SBNK/SWAR) | Needs a DS sequencer + synth in Kotlin, as DQ ran its GB driver on an APU synth |
 | Saves | `src/save*.c` | Own format, AtomicFile like DQ |
 
-## 3. Display (open decision)
+## 3. Display
 
-DC-1 window: 1184x1584. A remake is not tied to the DS's two 256x192 screens, so the layout can be
-designed like DQ's portrait canvas:
+DC-1 app window: 1184x1584 (Sol:OS override over the 1200x1600 panel).
 
-- **One portrait canvas** at a whole-number scale (4x gives 296x396 px of game; 5x gives 236x316). The
-  field view on top, a touch panel below in place of the DS bottom screen.
-- **Overworld:** the original is 3D (tilted camera over tile-based maps). Options: render the 3D models
-  with OpenGL ES at a fixed tilt; or a top-down 2D render from the map's tile and collision data with
-  hand-tuned gray tiles (closer to DQ's look, much simpler, not the original's picture).
-- **Tones:** DQ's tone LUT and presets. Grayscale art: palette-level remap plus hand fixes where colour
-  carries meaning (HP bars, tall grass vs path, status badges).
+- **Field canvas: 296x396 at 4x**, edge to edge. 4x is the scale at which the DS's full 256-px width fits
+  (5x gives 236 px, narrower than the original). The 3D camera keeps the original's pixel density: preset 0
+  (`src/field/field_camera.c`: distance 666.9, x angle 0xDD62, half fovy 0x5C1) with its 192 rows' density,
+  so the taller canvas shows more of the map above and below the player, never a zoomed picture.
+- **Renderer:** the original's 3D field, drawn the DS way (nearest texels, the material's repeat/flip,
+  modulate, per-vertex DS lighting from the area light file, alpha-cut texels), then the Daylight pass
+  (`render/DaylightStyle.kt`):
+  - luminance to gray with input levels and a gamma that darkens the mid-tones (grass, roofs) and keeps
+    paths light;
+  - solid black 1-px outlines where one object stands in front of another, where polygon ids differ (the
+    DS's own edge marking, `sAreaEdgeColorTable` in `src/field/area_data.c`, which the original draws in
+    dark gray 0x1084), and at depth creases within an object;
+  - dark rims on the ground where a pixel is much darker than its neighbour (the grass fringes).
+- **Bottom-screen panel, corner-docked:** open question: its size. The DS bottom screen at 4x is
+  1024x768 (most of the width); 2x is 512x384 (a third of the width, touch targets about 6 mm); 3x is 768x576.
+- **Tones:** DQ's presentation presets (Standard, Crisp, Low light, Custom, Calibrate) on top.
 
 ## 4. Carried over from DQ Daylight
 
@@ -72,6 +91,5 @@ touch grammar (joystick, tap = A, two-finger B, Back = B), black fades, Gradle `
 6. Mockups of the field and battle screens on the DC-1 before building them.
 
 ## Open questions for the owner
-- Overworld: real 3D, or top-down 2D?
-- HeartGold only, or SoulSilver too?
+- The docked panel's size (2x, 3x, collapsible to a tab?).
 - Scope of the first playable: one route and a wild battle, or New Bark Town to Violet City?

@@ -111,3 +111,9 @@ __pycache__
 
 # The owner's ROM (never commit it)
 /rom/
+
+# Daylight app build output
+/android/.gradle/
+/android/**/build/
+/android/local.properties
+/out/
