@@ -54,6 +54,9 @@ class Raster(val w: Int, val h: Int) {
     val surface = IntArray(w * h)
 
     private lateinit var view: FloatArray
+    private val right = FloatArray(3)
+    private val up = FloatArray(3)
+    private val spriteMat = Material("sprite", 0x7FFF, 0, (31 shl 16) or (63 shl 24) or 0xC0, 0, 0, null, null, 1f, 1f, 0f, 0f)
     private var focal = 1f
     private var near = 1f
     /** The area's light slot (`src/field/area_light.c`): lights plus the material colours every lit model uses. */
@@ -77,6 +80,8 @@ class Raster(val w: Int, val h: Int) {
         var rx = -fz; var ry = 0f; var rz = fx
         val rl = sqrt(rx * rx + rz * rz); rx /= rl; rz /= rl
         val ux = ry * fz - rz * fy; val uy = rz * fx - rx * fz; val uz = rx * fy - ry * fx
+        right[0] = rx; right[1] = ry; right[2] = rz
+        up[0] = ux; up[1] = uy; up[2] = uz
         view = floatArrayOf(
             rx, ry, rz, -(rx * eye[0] + ry * eye[1] + rz * eye[2]),
             ux, uy, uz, -(ux * eye[0] + uy * eye[1] + uz * eye[2]),
@@ -98,6 +103,21 @@ class Raster(val w: Int, val h: Int) {
                 Gx.run(model.shapes[d.shape].dl, dev.hgdaylight.g3d.Mat4.mul(p.world, d.matrix), model.posScale, mat, tex?.width ?: 1, tex?.height ?: 1, tris)
                 for (t in tris) triangle(t, tex, mat, p.instance, p.kind.ordinal + 1)
             }
+        }
+    }
+
+    /** A field object: a camera-facing [w] x [h] quad with its bottom centre at (x, y, z), as the DS's BB node. */
+    fun billboard(tex: Texture, x: Float, y: Float, z: Float, w: Int, h: Int, instance: Int) {
+        val hw = w / 2f
+        fun v(cx: Float, cy: Float, s: Float, t: Float) = Vtx(
+            x + right[0] * cx + up[0] * cy, y + right[1] * cx + up[1] * cy, z + right[2] * cx + up[2] * cy,
+            s, t, 1f, 1f, 1f, 0f, 0f, 0f, false,
+        )
+        val a = v(-hw, 0f, 0f, tex.height.toFloat()); val b = v(hw, 0f, tex.width.toFloat(), tex.height.toFloat())
+        val c = v(hw, h.toFloat(), tex.width.toFloat(), 0f); val d = v(-hw, h.toFloat(), 0f, 0f)
+        for (t in listOf(Tri(a, b, c), Tri(a, c, d))) {
+            val pa = project(t.a) ?: return; val pb = project(t.b) ?: return; val pc = project(t.c) ?: return
+            fill(arrayOf(pa, pb, pc), arrayOf(t.a, t.b, t.c), tex, spriteMat, instance, 3, false)
         }
     }
 

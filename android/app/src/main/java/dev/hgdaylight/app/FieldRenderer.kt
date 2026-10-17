@@ -5,6 +5,7 @@ import android.opengl.GLES32
 import android.opengl.GLSurfaceView
 import android.util.Log
 import dev.hgdaylight.g3d.Texture
+import dev.hgdaylight.render.DaylightStyle
 import dev.hgdaylight.render.FieldMesh
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -33,7 +34,14 @@ class FieldRenderer(private val game: FieldGame) : GLSurfaceView.Renderer {
     private var offY = 0f
 
     private var sceneProg = 0
-    private var postProg = 0
+    private var grayProg = 0
+    private var linesProg = 0
+    private var deviceProg = 0
+    private var grayTex = 0
+    private var grayFbo = 0
+    private var styledTex = 0
+    private var styledFbo = 0
+    private var lutTex = 0
     private var fbo = 0
     private var colorTex = 0
     private var idTex = 0
@@ -55,7 +63,10 @@ class FieldRenderer(private val game: FieldGame) : GLSurfaceView.Renderer {
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         sceneProg = program(Shaders.SCENE_VS, Shaders.SCENE_FS)
-        postProg = program(Shaders.POST_VS, Shaders.POST_FS)
+        grayProg = program(Shaders.QUAD_VS, Shaders.GRAY_FS)
+        linesProg = program(Shaders.QUAD_VS, Shaders.LINES_FS)
+        deviceProg = program(Shaders.QUAD_VS, Shaders.DEVICE_FS)
+        lutTex = makeLut()
         val ids = IntArray(2)
         glGenBuffers(2, ids, 0)
         quadVbo = ids[0]; spriteVbo = ids[1]
@@ -85,7 +96,7 @@ class FieldRenderer(private val game: FieldGame) : GLSurfaceView.Renderer {
 
         streamChunks()
         drawScene()
-        drawPost()
+        drawStyle()
 
         fpsFrames++
         if (now - fpsStart > 5_000_000_000L) {
@@ -189,7 +200,36 @@ class FieldRenderer(private val game: FieldGame) : GLSurfaceView.Renderer {
         glDrawBuffers(2, intArrayOf(GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1), 0)
         val status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
         if (status != GL_FRAMEBUFFER_COMPLETE) Log.e(TAG, "framebuffer incomplete: $status")
+        val (gt, gf) = colorTarget(grayTex, grayFbo); grayTex = gt; grayFbo = gf
+        val (st, sf) = colorTarget(styledTex, styledFbo); styledTex = st; styledFbo = sf
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
+    }
+
+    /** A canvas-sized RGBA8 texture with its framebuffer (replacing [oldTex]/[oldFbo]). */
+    private fun colorTarget(oldTex: Int, oldFbo: Int): Pair<Int, Int> {
+        if (oldFbo != 0) { glDeleteFramebuffers(1, intArrayOf(oldFbo), 0); glDeleteTextures(1, intArrayOf(oldTex), 0) }
+        val t = IntArray(1); glGenTextures(1, t, 0)
+        glBindTexture(GL_TEXTURE_2D, t[0])
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, canvasW, canvasH, 0, GL_RGBA, GL_UNSIGNED_BYTE, null)
+        nearestClamp()
+        val f = IntArray(1); glGenFramebuffers(1, f, 0)
+        glBindFramebuffer(GL_FRAMEBUFFER, f[0])
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, t[0], 0)
+        glDrawBuffers(1, intArrayOf(GL_COLOR_ATTACHMENT0), 0)
+        return t[0] to f[0]
+    }
+
+    /** DaylightStyle.LUT's field row as a 256x1 texture. */
+    private fun makeLut(): Int {
+        val b = ByteBuffer.allocateDirect(256).order(ByteOrder.nativeOrder())
+        for (i in 0 until 256) b.put(DaylightStyle.LUT[i].toByte())
+        b.position(0)
+        val t = IntArray(1); glGenTextures(1, t, 0)
+        glBindTexture(GL_TEXTURE_2D, t[0])
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, 256, 1, 0, GL_RED, GL_UNSIGNED_BYTE, b)
+        nearestClamp()
+        return t[0]
     }
 
     private fun nearestClamp() {
@@ -246,7 +286,7 @@ class FieldRenderer(private val game: FieldGame) : GLSurfaceView.Renderer {
         GLES32.glColorMaski(0, true, true, true, true)
         GLES32.glColorMaski(1, true, true, true, true)
         glDepthMask(true)
-        glClearBufferfv(GL_COLOR, 0, floatArrayOf(0f, 0f, 0f, 1f), 0)
+        glClearBufferfv(GL_COLOR, 0, floatArrayOf(0.96f, 0.96f, 0.96f, 1f), 0)
         glClearBufferfv(GL_COLOR, 1, floatArrayOf(0f, 0f, 0f, 0f), 0)
         glClearBufferfv(GL_DEPTH, 0, floatArrayOf(1f), 0)
         glEnable(GL_DEPTH_TEST)
@@ -308,11 +348,12 @@ class FieldRenderer(private val game: FieldGame) : GLSurfaceView.Renderer {
         glDisable(GL_CULL_FACE)
     }
 
-    private fun setId(loc: Int, instance: Int, polygonId: Int, ground: Boolean) {
+    /** Id target: instance in RGB; alpha = polygon id, +64 ground, +128 sprite (already gray). */
+    private fun setId(loc: Int, instance: Int, polygonId: Int, ground: Boolean, sprite: Boolean = false) {
         glUniform4f(
             loc,
             (instance and 255) / 255f, ((instance shr 8) and 255) / 255f, ((instance shr 16) and 255) / 255f,
-            ((polygonId and 63) or (if (ground) 64 else 0)) / 255f,
+            ((polygonId and 63) or (if (ground) 64 else 0) or (if (sprite) 128 else 0)) / 255f,
         )
     }
 
@@ -347,39 +388,62 @@ class FieldRenderer(private val game: FieldGame) : GLSurfaceView.Renderer {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
             glUniform1i(uHas, 1); glUniform1f(uAlpha, 1f); glUniform1i(uTrans, 0)
-            setId(uId, s.instance, 63, false)
+            setId(uId, s.instance, 63, false, sprite = true)
             glDrawArrays(GL_TRIANGLES, 0, 6)
         }
     }
 
-    private fun drawPost() {
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
-        glViewport(0, 0, viewW, viewH)
-        glDisable(GL_DEPTH_TEST)
-        glUseProgram(postProg)
-        fun tex(unit: Int, id: Int, name: String) {
-            glActiveTexture(GL_TEXTURE0 + unit); glBindTexture(GL_TEXTURE_2D, id)
-            glUniform1i(glGetUniformLocation(postProg, name), unit)
-        }
-        tex(0, colorTex, "uColor"); tex(1, idTex, "uIds"); tex(2, depthTex, "uDepth")
-        glActiveTexture(GL_TEXTURE0)
-        fun u(n: String) = glGetUniformLocation(postProg, n)
-        val st = game.style
-        glUniform2i(u("uCanvas"), canvasW, canvasH)
-        glUniform1i(u("uScale"), scale)
-        glUniform2f(u("uOffset"), offX, offY)
-        glUniform1f(u("uNear"), CAM_NEAR); glUniform1f(u("uFar"), CAM_FAR)
-        glUniform4f(u("uTone"), st.inLow, st.inHigh, st.gamma, 0f)
-        glUniform2f(u("uRange"), st.floor / 255f, st.ceil / 255f)
-        glUniform1f(u("uCrease"), st.creaseRatio)
-        glUniform1f(u("uRimContrast"), st.rimContrast / 255f)
-        glUniform1f(u("uRimShade"), st.rimShade / 255f)
-        glUniform3f(u("uPaper"), 0xF4 / 255f, 0xF4 / 255f, 0xF4 / 255f)
+    private fun quad() {
         glBindBuffer(GL_ARRAY_BUFFER, quadVbo)
         glEnableVertexAttribArray(0)
         glDisableVertexAttribArray(1); glDisableVertexAttribArray(2)
         glVertexAttribPointer(0, 2, GL_FLOAT, false, 8, 0)
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+    }
+
+    private fun bindTex(prog: Int, unit: Int, id: Int, name: String) {
+        glActiveTexture(GL_TEXTURE0 + unit); glBindTexture(GL_TEXTURE_2D, id)
+        glUniform1i(glGetUniformLocation(prog, name), unit)
+    }
+
+    /** DaylightStyle's canvasPass (gray, then ink and lines) and devicePass, on the GPU. */
+    private fun drawStyle() {
+        val st = game.style
+        glDisable(GL_DEPTH_TEST)
+        glDisable(GL_BLEND)
+
+        glBindFramebuffer(GL_FRAMEBUFFER, grayFbo)
+        glViewport(0, 0, canvasW, canvasH)
+        glUseProgram(grayProg)
+        bindTex(grayProg, 0, colorTex, "uColor"); bindTex(grayProg, 1, idTex, "uIds"); bindTex(grayProg, 2, lutTex, "uLut")
+        glUniform2i(glGetUniformLocation(grayProg, "uCanvas"), canvasW, canvasH)
+        val mix = DaylightStyle.MIX
+        glUniform4f(glGetUniformLocation(grayProg, "uMix"), mix[0], mix[1], mix[2], mix[3])
+        glUniform1f(glGetUniformLocation(grayProg, "uPaper"), st.paper / 255f)
+        quad()
+
+        glBindFramebuffer(GL_FRAMEBUFFER, styledFbo)
+        glUseProgram(linesProg)
+        bindTex(linesProg, 0, colorTex, "uColor"); bindTex(linesProg, 1, idTex, "uIds")
+        bindTex(linesProg, 2, grayTex, "uGray"); bindTex(linesProg, 3, depthTex, "uDepth")
+        glUniform2i(glGetUniformLocation(linesProg, "uCanvas"), canvasW, canvasH)
+        glUniform1f(glGetUniformLocation(linesProg, "uNear"), CAM_NEAR)
+        glUniform1f(glGetUniformLocation(linesProg, "uFar"), CAM_FAR)
+        glUniform1f(glGetUniformLocation(linesProg, "uCrease"), st.creaseRatio)
+        glUniform2f(glGetUniformLocation(linesProg, "uInk"), st.inkDark, st.inkLight)
+        quad()
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glViewport(0, 0, viewW, viewH)
+        glUseProgram(deviceProg)
+        bindTex(deviceProg, 0, styledTex, "uStyled")
+        glUniform2i(glGetUniformLocation(deviceProg, "uCanvas"), canvasW, canvasH)
+        glUniform1i(glGetUniformLocation(deviceProg, "uScale"), scale)
+        glUniform2f(glGetUniformLocation(deviceProg, "uOffset"), offX, offY)
+        glUniform1i(glGetUniformLocation(deviceProg, "uExtra"), (st.lineWidth - scale).coerceAtLeast(0))
+        glUniform1f(glGetUniformLocation(deviceProg, "uPaper"), st.paper / 255f)
+        quad()
+        glActiveTexture(GL_TEXTURE0)
     }
 
     private fun program(vs: String, fs: String): Int {

@@ -62,6 +62,10 @@ fun main(args: Array<String>) {
         r.light = light
         for (p in scene.placed) r.draw(p)
         r.flush()
+        if (!opt.containsKey("nohero")) {
+            val hero = dev.hgdaylight.field.HeroSprite(rom)
+            r.billboard(hero.frame(1, false, 0), target[0], target[1] + 16f, target[2] + dev.hgdaylight.field.HeroSprite.Z_BIAS, 32, 32, 0xFFFFF0)
+        }
         return r
     }
 
@@ -71,10 +75,11 @@ fun main(args: Array<String>) {
     // The DC-1 app window is 1184x1584: a 296x396 canvas at 4x.
     val canvas = render(296, 396)
     write(canvas.w, canvas.h, canvas.color, 4, File(outDir, "${tag}_portrait_color_4x.png"))
-    val gray = DaylightStyle.apply(canvas)
-    val g = IntArray(gray.size) { 0xFF000000.toInt() or (gray[it] * 0x010101) }
+    val st = DaylightStyle.Options(lineWidth = opt["line"]?.toInt() ?: 6)
+    val styled = DaylightStyle.canvasPass(canvas, st)
+    val g = IntArray(styled.gray.size) { 0xFF000000.toInt() or ((if (styled.lines[it] != 0) 0 else styled.gray[it]) * 0x010101) }
     write(canvas.w, canvas.h, g, 1, File(outDir, "${tag}_portrait_daylight.png"))
-    write(canvas.w, canvas.h, g, 4, File(outDir, "${tag}_portrait_daylight_4x.png"))
+    write(canvas.w * st.scale, canvas.h * st.scale, DaylightStyle.devicePass(styled, st), 1, File(outDir, "${tag}_portrait_daylight_4x.png"))
     if (opt.containsKey("debug")) {
         val ids = IntArray(canvas.id.size) { val v = canvas.id[it] * 2654435761L.toInt(); 0xFF000000.toInt() or (v ushr 8) }
         write(canvas.w, canvas.h, ids, 2, File(outDir, "${tag}_ids.png"))

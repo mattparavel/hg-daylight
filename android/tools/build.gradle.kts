@@ -17,3 +17,9 @@ tasks.register<JavaExec>("renderMap") {
     args = (project.findProperty("args") as String? ?: "").split(" ").filter { it.isNotBlank() }
     jvmArgs("-Xmx2g")
 }
+
+tasks.register<JavaExec>("dumpSprite") {
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("dev.hgdaylight.tools.DumpSpriteKt")
+    workingDir = rootProject.projectDir.parentFile
+}
