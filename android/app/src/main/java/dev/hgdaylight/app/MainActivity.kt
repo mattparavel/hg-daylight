@@ -109,7 +109,9 @@ class MainActivity : Activity() {
         v.setRenderer(FieldRenderer(game))
         v.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
         view = v
-        val panel = PanelView(this, game.panelScreen)
+        val panel = PanelView(this, game.touchMenu)
+        // The icons' screens (Pokégear, Pokémon, Bag, ...) are not built yet; a press only highlights.
+        panel.onIcon = { Log.i(TAG, "touch menu icon $it") }
         setContentView(FrameLayout(this).apply {
             addView(v)
             addView(panel)

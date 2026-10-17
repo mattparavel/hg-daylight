@@ -79,6 +79,21 @@ object DaylightStyle {
         return LUT[256 + l]
     }
 
+    /**
+     * UI (the touch panel): four tones, as DQ Daylight's chrome. The menu's dark greens (frames, line art,
+     * keylines, luminance < 0.45) become ink, its mid green box light gray, the icons' mint pale, white white.
+     */
+    fun uiGray(c: Int): Int {
+        val r = (c shr 16) and 255; val g = (c shr 8) and 255; val b = c and 255
+        val l = (0.299f * r + 0.587f * g + 0.114f * b) / 255f
+        return when {
+            l < 0.45f -> 0x00
+            l < 0.62f -> 0xB4
+            l < 0.85f -> 0xDC
+            else -> 0xFF
+        }
+    }
+
     /** Per canvas pixel: gray, and which of its 4 sides carry a line (bit k: neighbour k is the far side). */
     class Canvas(val w: Int, val h: Int, val gray: IntArray, val lines: IntArray)
 

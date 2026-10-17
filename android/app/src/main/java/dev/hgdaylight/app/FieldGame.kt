@@ -30,8 +30,8 @@ class FieldGame(private val rom: NdsRom) {
     val style = DaylightStyle.Options()
     var input: Joystick? = null
     private val hero = HeroSprite(rom)
-    /** The field touch menu's background (`src/field/touchscreen_menu.c`: a/0/1/4 palette 7, chars 8, screen 9). */
-    val panelScreen: Texture = dev.hgdaylight.g2d.Bg2d.render(rom.narc("a/0/1/4"), 7, 8, 9)
+    /** The field touch menu (`src/field/touchscreen_menu.c`), drawn from the ROM. */
+    val touchMenu = dev.hgdaylight.g2d.TouchMenu(rom)
 
     /** The map header the player is in, its world (matrix + area) and its events. */
     var header = MAP_NEW_BARK
