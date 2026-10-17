@@ -11,6 +11,7 @@ fun main() {
     write(t.width, t.height, t.argb, 2, File("out/panel.png"))
     val h = menu.render(highlight = 1)
     write(h.width, h.height, h.argb, 2, File("out/panel_hl.png"))
-    val g = IntArray(t.argb.size) { 0xFF000000.toInt() or (dev.hgdaylight.render.DaylightStyle.uiGray(t.argb[it]) * 0x010101) }
+    val ink = menu.render(inkLabels = true)
+    val g = IntArray(ink.argb.size) { 0xFF000000.toInt() or (dev.hgdaylight.render.DaylightStyle.uiGray(ink.argb[it]) * 0x010101) }
     write(t.width, t.height, g, 2, File("out/panel_gray.png"))
 }

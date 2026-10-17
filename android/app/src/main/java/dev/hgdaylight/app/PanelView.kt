@@ -28,7 +28,7 @@ class PanelView(context: Context, private val menu: TouchMenu) : View(context) {
 
     /** The menu in the UI's four tones, plain and with each icon highlighted (pressed). */
     private fun bitmapOf(highlight: Int): Bitmap {
-        val t = menu.render(highlight)
+        val t = menu.render(highlight, inkLabels = true)
         val px = IntArray(256 * 192) { 0xFF000000.toInt() or (DaylightStyle.uiGray(t.argb[it]) * 0x010101) }
         return Bitmap.createBitmap(256, 192, Bitmap.Config.ARGB_8888).also { it.setPixels(px, 0, 256, 0, 0, 256, 192) }
     }

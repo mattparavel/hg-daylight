@@ -33,6 +33,12 @@ object Lz10 {
  * a texture. Tiles are 8x8, 4 or 8 bpp; map entries are tile (10 bits), h/v flip, palette (4 bits).
  */
 object Bg2d {
+    /** An NCLR's colours (RGB888), all sub-palettes in order. */
+    fun palette(narc: Narc, member: Int): IntArray {
+        val pal = Lz10.decode(narc[member])
+        return IntArray((pal.size - 0x28) / 2) { rgb555(pal.u16(0x28 + 2 * it)) }
+    }
+
     fun render(narc: Narc, pltt: Int, chars: Int, screen: Int): Texture {
         val pal = Lz10.decode(narc[pltt]); val chr = Lz10.decode(narc[chars]); val scr = Lz10.decode(narc[screen])
         val tt = 0x10 // TTLP

@@ -25,11 +25,13 @@ The walk-around demo on the DC-1 (`./gradlew :app:installFast` from `android/`, 
 - the hero (hand-toned) walking with the decomp's timing, collision, ledges and BDHC heights;
 - the map's people and objects standing in place (zone events, the sprite table in overlay 1);
 - doors and exit mats warping between maps (the map header table in the ARM9 binary), with a black fade;
-- the field touch menu's background as a panel docked in a corner (drag to another corner, double-tap to fold).
+- the field touch menu as a panel docked in a corner (drag to another corner, double-tap to fold): its BG,
+  the seven icons (cells from a/0/1/4) and their labels (message bank 196 in the ROM's font 0), in the UI's
+  four tones with black ink labels; a press shows the icon's highlighted palette.
 
 Next, in order:
-1. The touch menu's icons (OBJ cells: NCER + NCGR from a/0/1/4, palette 14, `src/field/touchscreen_menu.c`)
-   and what they open.
+1. What the touch menu's icons open (Pokédex, Trainer Card, Pokémon, Save, Bag, Options, Pokégear), and its
+   right-hand buttons (registered items, running shoes: char 70, cells 68/69).
 2. Talking: A on an NPC or a sign (bg events) runs its script; needs the message decoder (`files/msgdata`) and
    the event-script VM (`src/scrcmd*.c`).
 3. NPC movement types (wander, look around) and event flags (who is hidden at the start).

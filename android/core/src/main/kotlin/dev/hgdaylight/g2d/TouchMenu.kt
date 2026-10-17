@@ -69,22 +69,54 @@ fun drawCell(cell: List<Oam>, chars: Bytes, colors: IntArray, palBase: Int, out:
  * (sTouchscreenMenuLayouts[0]: icons 0-6) at sTouchscreenMenuIconPositions, each its own char file
  * (sTouchscreenMenuIcons) through cell bank 16, palette 14 (0-15 normal, 16-31 highlighted).
  */
-class TouchMenu(rom: NdsRom) {
+class TouchMenu(rom: NdsRom, private val playerName: IntArray = ETHAN) {
     private val narc: Narc = rom.narc("a/0/1/4")
     private val bg = Bg2d.render(narc, 7, 8, 9)
     private val cells = CellBank(Lz10.decode(narc[16]))
     private val iconColors: IntArray = Lz10.decode(narc[14]).let { p -> IntArray((p.size - 0x28) / 2) { rgb555(p.u16(0x28 + 2 * it)) } }
     private val iconChars = ICON_CHARS.map { Lz10.decode(narc[it]) }
+    private val font = dev.hgdaylight.text.Font.load(rom)
+    private val bgColors = Bg2d.palette(narc, 7)
+    /** Labels: message bank 196 (msg_0196), sTouchscreenMenuIcons[i].msgId; the player's name stands in for its placeholder. */
+    private val labels: List<IntArray> = dev.hgdaylight.text.MsgBank.load(rom, 196).let { bank ->
+        ICON_MSGS.map { expand(bank.codes(it)) }
+    }
+
+    /** {STRVAR_n} (0xFFFE 0x01nn ...) becomes [playerName]; other control codes stay for Font to skip. */
+    private fun expand(codes: IntArray): IntArray {
+        val out = ArrayList<Int>()
+        var i = 0
+        while (i < codes.size) {
+            if (codes[i] == 0xFFFE && i + 2 < codes.size) {
+                val n = 3 + codes[i + 2]
+                if ((codes[i + 1] ushr 8) == 0x01) out += playerName.toList() else out += codes.copyOfRange(i, minOf(codes.size, i + n)).toList()
+                i += n
+            } else out += codes[i++]
+        }
+        return out.toIntArray()
+    }
 
     /** Icon [i]'s touch box in screen pixels (sTouchscreenMenuIconHitboxes): left, top, right, bottom. */
     fun hitbox(i: Int): IntArray = HITBOXES[i]
 
-    /** The bottom screen (256x192) with icon [highlight] in its highlighted palette (-1: none). */
-    fun render(highlight: Int = -1): Texture {
+    /**
+     * The bottom screen (256x192) with icon [highlight] in its highlighted palette (-1: none). [inkLabels]:
+     * the Daylight panel's labels, black ink with no shadow (the original: white, shadowed).
+     */
+    fun render(highlight: Int = -1, inkLabels: Boolean = false): Texture {
         val out = IntArray(256 * 192) { val y = it / 256; val x = it % 256; bg.argb[y * bg.width + x] }
         for (i in ICON_CHARS.indices) {
             val (x, y) = POSITIONS[i]
             drawCell(cells.cells[0], iconChars[i], iconColors, if (i == highlight) 1 else 0, out, 256, 192, x, y)
+        }
+        // TouchscreenMenu_PrintIconLabels: 9x2-tile windows (sTouchscreenMenuIconWindowPositions), the label
+        // centred in 72 px, colour 14 with shadow 2 of BG palette 4.
+        val fg = if (inkLabels) 0xFF000000.toInt() else 0xFF000000.toInt() or bgColors[4 * 16 + 14]
+        val shadow = if (inkLabels) null else 0xFF000000.toInt() or bgColors[4 * 16 + 2]
+        for (i in labels.indices) {
+            val (tx, ty) = LABEL_WINDOWS[i]
+            val margin = 72 - font.textWidth(labels[i])
+            font.draw(labels[i], out, 256, 192, tx * 8 + margin / 2, ty * 8, fg, shadow)
         }
         return Texture("touchmenu", 256, 192, out)
     }
@@ -92,6 +124,12 @@ class TouchMenu(rom: NdsRom) {
     companion object {
         /** sTouchscreenMenuIcons[0..6].charFileId (the male player's card is 0x18; the female's is 27). */
         val ICON_CHARS = listOf(0x12, 0x15, 0x18, 0x1E, 0x21, 0x24, 0x27)
+        /** sTouchscreenMenuIcons[0..6].msgId. */
+        val ICON_MSGS = listOf(0, 1, 2, 14, 3, 4, 5)
+        /** sTouchscreenMenuIconWindowPositions (tiles), slots 0-6. */
+        val LABEL_WINDOWS = listOf(1 to 6, 1 to 11, 1 to 16, 1 to 21, 11 to 6, 11 to 11, 11 to 16)
+        /** "ETHAN" in charmap codes (A = 0x12B): the default name until a save gives one. */
+        val ETHAN = intArrayOf(0x12F, 0x13E, 0x132, 0x12B, 0x138)
         /** sTouchscreenMenuIconPositions, slots 0-6. */
         val POSITIONS = listOf(24 to 22, 24 to 62, 24 to 102, 24 to 142, 104 to 22, 104 to 62, 104 to 102)
         /** sTouchscreenMenuIconHitboxes (top, bottom, left, right bytes) for slots 0-6, as left, top, right, bottom. */
