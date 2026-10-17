@@ -108,3 +108,6 @@ __pycache__
 .local-tools/
 .venv/
 *.pyc
+
+# The owner's ROM (never commit it)
+/rom/
