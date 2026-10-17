@@ -109,7 +109,11 @@ class MainActivity : Activity() {
         v.setRenderer(FieldRenderer(game))
         v.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
         view = v
-        setContentView(v)
+        val panel = PanelView(this, game.panelScreen)
+        setContentView(FrameLayout(this).apply {
+            addView(v)
+            addView(panel)
+        })
         immersive()
         prefer60Hz()
     }

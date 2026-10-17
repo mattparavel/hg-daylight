@@ -157,6 +157,8 @@ uniform int uScale;
 uniform vec2 uOffset;
 uniform int uExtra;
 uniform float uPaper;
+/** Fade to black (DQ Daylight's default transition), 0 clear .. 1 black. */
+uniform float uFade;
 out vec4 oColor;
 int maskAt(ivec2 q) { return int(texelFetch(uStyled, q, 0).g * 255.0 + 0.5); }
 void main() {
@@ -175,7 +177,7 @@ void main() {
             if ((maskAt(q) & (1 << (k ^ 1))) != 0 && dist[k] < uExtra) { g = 0.0; break; }
         }
     }
-    oColor = vec4(vec3(g), 1.0);
+    oColor = vec4(vec3(g * (1.0 - uFade)), 1.0);
 }
 """
 }

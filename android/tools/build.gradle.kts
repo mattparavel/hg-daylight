@@ -23,3 +23,9 @@ tasks.register<JavaExec>("dumpSprite") {
     mainClass.set("dev.hgdaylight.tools.DumpSpriteKt")
     workingDir = rootProject.projectDir.parentFile
 }
+
+tasks.register<JavaExec>("dumpPanel") {
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("dev.hgdaylight.tools.DumpPanelKt")
+    workingDir = rootProject.projectDir.parentFile
+}

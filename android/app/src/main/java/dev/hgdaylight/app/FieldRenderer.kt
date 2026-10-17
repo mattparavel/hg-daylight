@@ -50,7 +50,9 @@ class FieldRenderer(private val game: FieldGame) : GLSurfaceView.Renderer {
     private var spriteVbo = 0
 
     private val worker = Executors.newSingleThreadExecutor { Thread(it, "chunks").apply { priority = Thread.NORM_PRIORITY - 1 } }
-    private val pending = ConcurrentHashMap<Long, FieldMesh>()
+    private val pending = ConcurrentHashMap<Long, Pair<dev.hgdaylight.field.World, FieldMesh>>()
+    /** The world the uploaded chunks belong to; a warp swaps it and the chunks are dropped. */
+    private var shownWorld: dev.hgdaylight.field.World? = null
     private val requested = HashSet<Long>()
     private val chunks = HashMap<Long, GpuChunk>()
     private val textures = HashMap<Texture, Int>()
@@ -112,19 +114,26 @@ class FieldRenderer(private val game: FieldGame) : GLSurfaceView.Renderer {
 
     /** Keeps the 3x3 chunks around the player built and uploaded, and frees the rest. */
     private fun streamChunks() {
+        val w = game.world
+        if (w !== shownWorld) {
+            for (c in chunks.values) glDeleteBuffers(1, intArrayOf(c.vbo), 0)
+            chunks.clear(); requested.clear(); pending.clear()
+            shownWorld = w
+        }
         val (pcx, pcz) = game.chunkOfPlayer()
         val want = HashSet<Long>()
         for (dz in -1..1) for (dx in -1..1) {
             val cx = pcx + dx; val cz = pcz + dz
-            if (!game.world.inside(cx, cz)) continue
+            if (!w.inside(cx, cz)) continue
             val k = key(cx, cz)
             want += k
             if (k !in chunks && requested.add(k)) worker.execute {
-                runCatching { pending[k] = game.world.chunkMesh(cx, cz) }.onFailure { Log.e(TAG, "chunk $cx,$cz", it) }
+                runCatching { pending[k] = w to w.chunkMesh(cx, cz) }.onFailure { Log.e(TAG, "chunk $cx,$cz", it) }
             }
         }
         for (k in pending.keys.toList()) {
-            val m = pending.remove(k) ?: continue
+            val (from, m) = pending.remove(k) ?: continue
+            if (from !== w) continue
             if (k in want) chunks[k] = upload(m) else requested.remove(k)
         }
         val drop = chunks.keys.filter { it !in want }
@@ -316,7 +325,8 @@ class FieldRenderer(private val game: FieldGame) : GLSurfaceView.Renderer {
         GLES32.glColorMaski(0, true, true, true, true)
         GLES32.glColorMaski(1, true, true, true, true)
         glDepthMask(true)
-        glClearBufferfv(GL_COLOR, 0, floatArrayOf(0.96f, 0.96f, 0.96f, 1f), 0)
+        val bg = if (game.indoor) 0f else 0.96f
+        glClearBufferfv(GL_COLOR, 0, floatArrayOf(bg, bg, bg, 1f), 0)
         glClearBufferfv(GL_COLOR, 1, floatArrayOf(0f, 0f, 0f, 0f), 0)
         glClearBufferfv(GL_DEPTH, 0, floatArrayOf(1f), 0)
         glEnable(GL_DEPTH_TEST)
@@ -450,7 +460,7 @@ class FieldRenderer(private val game: FieldGame) : GLSurfaceView.Renderer {
         glUniform2i(glGetUniformLocation(grayProg, "uCanvas"), canvasW, canvasH)
         val mix = DaylightStyle.MIX
         glUniform4f(glGetUniformLocation(grayProg, "uMix"), mix[0], mix[1], mix[2], mix[3])
-        glUniform1f(glGetUniformLocation(grayProg, "uPaper"), st.paper / 255f)
+        glUniform1f(glGetUniformLocation(grayProg, "uPaper"), if (game.indoor) 0f else st.paper / 255f)
         quad()
 
         glBindFramebuffer(GL_FRAMEBUFFER, styledFbo)
@@ -473,7 +483,8 @@ class FieldRenderer(private val game: FieldGame) : GLSurfaceView.Renderer {
         glUniform1i(glGetUniformLocation(deviceProg, "uScale"), scale)
         glUniform2f(glGetUniformLocation(deviceProg, "uOffset"), offX, offY)
         glUniform1i(glGetUniformLocation(deviceProg, "uExtra"), (st.lineWidth - scale).coerceAtLeast(0))
-        glUniform1f(glGetUniformLocation(deviceProg, "uPaper"), st.paper / 255f)
+        glUniform1f(glGetUniformLocation(deviceProg, "uPaper"), if (game.indoor) 0f else st.paper / 255f)
+        glUniform1f(glGetUniformLocation(deviceProg, "uFade"), game.fade)
         quad()
         glActiveTexture(GL_TEXTURE0)
     }

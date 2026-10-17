@@ -55,6 +55,17 @@ class NdsRom(data: ByteBuffer) {
 
     fun narc(path: String): Narc = Narc(file(path))
 
+    /** The ARM9 binary as stored (compressed past its first 0x4000 bytes). */
+    fun rawArm9(): ByteArray = b.copy(b.u32(0x20), b.u32(0x2C))
+
+    /** ARM9 overlay [n], decompressed if its table entry says so (flag bit 24, size in the low 24 bits). */
+    fun overlay(n: Int): ByteArray {
+        val e = b.u32(0x50) + 32 * n
+        val raw = file(b.u32(e + 24)).copy()
+        val flags = b.u32(e + 28)
+        return if (flags and (1 shl 24) != 0) Blz.decode(raw, flags and 0xFFFFFF) else raw
+    }
+
     companion object {
         const val SOULSILVER_US_SHA1 = "f8dc38ea20c17541a43b58c5e6d18c1732c7e582"
 

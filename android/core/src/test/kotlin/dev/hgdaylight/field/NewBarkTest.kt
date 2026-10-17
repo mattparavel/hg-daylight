@@ -40,3 +40,29 @@ class NewBarkTest {
         assertNotNull(h)
     }
 }
+
+class GameDataTest {
+    private val romFile = File("../../rom/soulsilver.us.nds")
+
+    @Test
+    fun headersEventsAndSprites() {
+        if (!romFile.exists()) return
+        val rom = NdsRom.load(romFile)
+        val gd = GameData(rom)
+        val nb = gd.headers[60]
+        assertEquals(2, nb.areaDataBank); assertEquals(0, nb.matrixId); assertEquals(57, nb.eventsBank)
+        val lab = gd.headers[61]
+        println("lab: area ${lab.areaDataBank} matrix ${lab.matrixId} events ${lab.eventsBank}")
+        val ev = MapEvents.load(rom, nb.eventsBank)
+        println("New Bark: ${ev.bgs.size} bgs, ${ev.objects.size} objects, ${ev.warps.size} warps")
+        for (o in ev.objects) println("  obj ${o.id} sprite ${o.spriteId} -> mmodel ${gd.mmodelOf(o.spriteId)} at (${o.x}, ${o.z}) facing ${o.facing} move ${o.movement}")
+        for (w in ev.warps) println("  warp (${w.x}, ${w.z}) -> header ${w.header} anchor ${w.anchor}")
+        assertEquals(5, ev.warps.size)
+        assertEquals(61, ev.warps[0].header)
+        val woman = ev.objects.first { it.spriteId == 325 }
+        val s = ObjectSprite(rom, gd.mmodelOf(woman.spriteId)!!)
+        println("woman frame ${s.frame(1).width}x${s.frame(1).height}")
+        val labEv = MapEvents.load(rom, lab.eventsBank)
+        for (w in labEv.warps) println("  lab warp (${w.x}, ${w.z}) -> header ${w.header} anchor ${w.anchor}")
+    }
+}

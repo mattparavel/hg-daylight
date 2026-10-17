@@ -28,7 +28,7 @@ fun main(args: Array<String>) {
     val header = opt["header"]?.toInt() ?: 60 // MAP_NEW_BARK
     val area = opt["area"]?.toInt() ?: 2
     val matrix = MapMatrix(rom.narc(Narcs.MAP_MATRIX)[matrixId])
-    val cell = matrix.headers?.indexOfFirst { it == header }?.takeIf { it >= 0 } ?: error("Header $header not in matrix $matrixId")
+    val cell = opt["cell"]?.toInt() ?: matrix.headers?.indexOfFirst { it == header }?.takeIf { it >= 0 } ?: 0
     val cx = cell % matrix.width; val cz = cell / matrix.width
     val (tx, tz) = (opt["tile"] ?: "16,16").split(",").map { it.toInt() }
     println("matrix ${matrix.name} ${matrix.width}x${matrix.height}, header $header at cell ($cx, $cz)")
