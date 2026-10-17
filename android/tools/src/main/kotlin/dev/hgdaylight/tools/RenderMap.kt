@@ -15,7 +15,7 @@ import javax.imageio.ImageIO
  * Renders a field view from the ROM to PNGs in out/: the original colours at DS size, and the Daylight
  * gray with outlines on the portrait canvas, at 1x and at the DC-1's 4x.
  *
- *   ./gradlew :core:renderMap -Pargs="--header 60 --tile 16,16"
+ *   ./gradlew :tools:renderMap -Pargs="--header 60 --tile 16,16"
  */
 fun main(args: Array<String>) {
     val opt = HashMap<String, String>()

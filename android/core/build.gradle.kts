@@ -10,12 +10,3 @@ dependencies {
 }
 
 tasks.test { useJUnitPlatform() }
-
-// ./gradlew :core:renderMap -Pargs="--map 60"
-tasks.register<JavaExec>("renderMap") {
-    classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("dev.hgdaylight.tools.RenderMapKt")
-    workingDir = rootProject.projectDir.parentFile
-    args = (project.findProperty("args") as String? ?: "").split(" ").filter { it.isNotBlank() }
-    jvmArgs("-Xmx2g")
-}

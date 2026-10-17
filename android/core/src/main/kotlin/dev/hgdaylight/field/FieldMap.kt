@@ -49,9 +49,10 @@ class LandData(b: Bytes) {
     val permissions: Bytes
     val props: List<PropPlacement>
     val model: Bmd
+    val bdhc: Bdhc?
 
     init {
-        val permSize = b.u32(0); val propsSize = b.u32(4); val modelSize = b.u32(8)
+        val permSize = b.u32(0); val propsSize = b.u32(4); val modelSize = b.u32(8); val bdhcSize = b.u32(12)
         var p = 16
         val soundplates = b.u32(p) ushr 16
         p += 4 + soundplates
@@ -67,10 +68,17 @@ class LandData(b: Bytes) {
         }
         p += propsSize
         model = Bmd(NnsFile(b.at(p, modelSize)))
+        p += modelSize
+        bdhc = if (bdhcSize > 16) runCatching { Bdhc(b.at(p, bdhcSize)) }.getOrNull() else null
     }
 
-    /** Permission word for tile (x, z): low byte = behaviour, bit 15 = blocked (`src/field/map_load_manager.c`). */
+    /**
+     * Permission word for tile (x, z) of the chunk: bits 0-7 behaviour (GetMetatileBehavior), bit 15 blocked
+     * (FieldSystem_CheckTileCollision), `src/field_terrain.c`.
+     */
     fun permission(x: Int, z: Int): Int = permissions.u16(2 * (z * 32 + x))
+    fun blocked(x: Int, z: Int): Boolean = permission(x, z) and 0x8000 != 0
+    fun behavior(x: Int, z: Int): Int = permission(x, z) and 0xFF
 }
 
 /** AreaDataHeader (`src/field/area_data.c`). */

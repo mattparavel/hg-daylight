@@ -6,4 +6,4 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 rootProject.name = "SSDaylight"
-include(":core")
+include(":core", ":tools", ":app")

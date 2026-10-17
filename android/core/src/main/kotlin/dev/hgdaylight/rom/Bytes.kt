@@ -1,9 +1,16 @@
 package dev.hgdaylight.rom
 
-/** Little-endian reads over a byte array, the way the DS lays out every structure. */
-class Bytes(val a: ByteArray, val base: Int = 0, val size: Int = a.size - base) {
-    fun u8(o: Int): Int = a[base + o].toInt() and 0xFF
-    fun s8(o: Int): Int = a[base + o].toInt()
+import java.nio.ByteBuffer
+
+/**
+ * Little-endian reads over a byte buffer (a memory-mapped ROM on the device), the way the DS lays out every
+ * structure. Absolute reads only, so views are cheap and thread-safe.
+ */
+class Bytes(val a: ByteBuffer, val base: Int = 0, val size: Int = a.capacity() - base) {
+    constructor(bytes: ByteArray) : this(ByteBuffer.wrap(bytes))
+
+    fun u8(o: Int): Int = a.get(base + o).toInt() and 0xFF
+    fun s8(o: Int): Int = a.get(base + o).toInt()
     fun u16(o: Int): Int = u8(o) or (u8(o + 1) shl 8)
     fun s16(o: Int): Int = u16(o).toShort().toInt()
     fun u32(o: Int): Int = u16(o) or (u16(o + 2) shl 16)
@@ -12,7 +19,7 @@ class Bytes(val a: ByteArray, val base: Int = 0, val size: Int = a.size - base) 
     /** A view starting at [o] (relative to this view). */
     fun at(o: Int, len: Int = size - o): Bytes = Bytes(a, base + o, len)
 
-    fun copy(o: Int = 0, len: Int = size - o): ByteArray = a.copyOfRange(base + o, base + o + len)
+    fun copy(o: Int = 0, len: Int = size - o): ByteArray = ByteArray(len) { a.get(base + o + it) }
 
     fun ascii(o: Int, len: Int): String {
         val sb = StringBuilder()

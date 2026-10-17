@@ -1,13 +1,16 @@
 package dev.hgdaylight.rom
 
 import java.io.File
+import java.io.RandomAccessFile
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
 import java.security.MessageDigest
 
 /**
  * The cartridge image and its NitroFS: the header's file name table (FNT) and file allocation table (FAT).
  * Paths are the ones the decomp uses, e.g. "a/0/6/5" (`include/filesystem_files_def.h`).
  */
-class NdsRom(val data: ByteArray) {
+class NdsRom(data: ByteBuffer) {
     private val b = Bytes(data)
     val title: String = b.ascii(0, 12)
     val gameCode: String = b.ascii(12, 4)
@@ -55,9 +58,18 @@ class NdsRom(val data: ByteArray) {
     companion object {
         const val SOULSILVER_US_SHA1 = "f8dc38ea20c17541a43b58c5e6d18c1732c7e582"
 
-        fun sha1(data: ByteArray): String =
-            MessageDigest.getInstance("SHA-1").digest(data).joinToString("") { "%02x".format(it) }
+        fun sha1(file: File): String {
+            val md = MessageDigest.getInstance("SHA-1")
+            file.inputStream().use { s ->
+                val buf = ByteArray(1 shl 20)
+                while (true) { val n = s.read(buf); if (n < 0) break; md.update(buf, 0, n) }
+            }
+            return md.digest().joinToString("") { "%02x".format(it) }
+        }
 
-        fun load(file: File): NdsRom = NdsRom(file.readBytes())
+        /** Memory-mapped: the 128 MB image is never copied onto the heap. */
+        fun load(file: File): NdsRom = RandomAccessFile(file, "r").use { f ->
+            NdsRom(f.channel.map(FileChannel.MapMode.READ_ONLY, 0, f.length()))
+        }
     }
 }

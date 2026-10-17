@@ -17,7 +17,7 @@ player experiences is an option, off by default, captioned *Not in the original*
 Status (2026-10-17): the field renderer works. `android/core` reads the SoulSilver ROM's NitroFS, NARCs,
 map matrix, land data, area data, map and prop textures (all 7 DS texture formats), BMD0 models (SBC, nodes,
 materials, GX display lists) and the area light files, and renders a field view in the original's colours and
-in the Daylight style: `./gradlew :core:renderMap -Pargs="--header 60"` (New Bark Town) writes PNGs to `out/`.
+in the Daylight style: `./gradlew :tools:renderMap -Pargs="--header 60"` (New Bark Town) writes PNGs to `out/`.
 
 ## Owner decisions (2026-10-17)
 - **SoulSilver only** (`rom/soulsilver.us.nds`, `sha1 f8dc38ea20c17541a43b58c5e6d18c1732c7e582`).
