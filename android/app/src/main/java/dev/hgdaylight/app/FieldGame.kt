@@ -114,6 +114,7 @@ class FieldGame(rom: NdsRom) {
             motion = Motion.WALK; frames = STEP_FRAMES
         }
         lastWasStep = motion != Motion.BUMP
+        if (BuildConfig.DEBUG || LOG_STEPS) android.util.Log.i("SSDaylight", "step dir=$d $motion -> tile ($tileX, $tileZ) beh=${"%02x".format(beh)} y=$y")
     }
 
     private fun canEnter(nx: Int, nz: Int, d: Int): Boolean {
@@ -161,6 +162,7 @@ class FieldGame(rom: NdsRom) {
         val DZ = intArrayOf(-1, 1, 0, 0)
         const val STEP_FRAMES = 16
         const val TURN_FRAMES = 6
+        @JvmField var LOG_STEPS = false
         const val PLAYER_ID = 0xFFFFF0
 
         /** Ledge behaviours 0x38-0x3B jump east, west, north, south (`include/constants/metatile_behavior.h`). */

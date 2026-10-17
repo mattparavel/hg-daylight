@@ -111,6 +111,15 @@ class MainActivity : Activity() {
         view = v
         setContentView(v)
         immersive()
+        prefer60Hz()
+    }
+
+    /** The game ticks at 60 Hz; ask for the display mode nearest 60 (the DC-1 defaults to 90), as DQ does. */
+    private fun prefer60Hz() {
+        @Suppress("DEPRECATION")
+        val display = windowManager.defaultDisplay ?: return
+        val mode = display.supportedModes.minByOrNull { kotlin.math.abs(it.refreshRate - 60f) } ?: return
+        window.attributes = window.attributes.apply { preferredDisplayModeId = mode.modeId }
     }
 
     private fun immersive() {

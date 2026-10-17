@@ -14,6 +14,7 @@ android {
         versionCode = 1
         versionName = "0.1"
     }
+    buildFeatures { buildConfig = true }
     buildTypes {
         // Day to day: R8-optimized, signed with the debug key under the same id, so `adb install -r`
         // replaces a debug install and keeps the imported ROM (./gradlew :app:installFast).

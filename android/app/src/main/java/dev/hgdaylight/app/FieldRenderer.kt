@@ -86,7 +86,16 @@ class FieldRenderer(private val game: FieldGame) : GLSurfaceView.Renderer {
         streamChunks()
         drawScene()
         drawPost()
+
+        fpsFrames++
+        if (now - fpsStart > 5_000_000_000L) {
+            Log.i(TAG, "%.1f fps, %d chunks".format(fpsFrames * 1e9 / (now - fpsStart), chunks.size))
+            fpsStart = now; fpsFrames = 0
+        }
     }
+
+    private var fpsStart = System.nanoTime()
+    private var fpsFrames = 0
 
     private fun key(cx: Int, cz: Int) = (cx.toLong() shl 32) or (cz.toLong() and 0xFFFFFFFFL)
 
